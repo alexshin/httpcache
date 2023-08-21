@@ -133,6 +133,17 @@ func NewTransport(c Cache) *Transport {
 	return t
 }
 
+// NewConfigurableTransport returns a new Transport with the
+// provided Config that can manage behaviour of cache-key generation and authorization
+func NewConfigurableTransport(c Cache, con *CacheConfig) *Transport {
+	var t = &Transport{
+		Cache:               c,
+		MarkCachedResponses: true,
+	}
+	t.CacheConfig = con
+	return t
+}
+
 // Client returns an *http.Client that caches responses.
 func (t *Transport) Client() *http.Client {
 	return &http.Client{Transport: t}
