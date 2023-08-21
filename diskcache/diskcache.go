@@ -6,7 +6,7 @@ import (
 	"bytes"
 	"crypto/md5"
 	"encoding/hex"
-	diskv "github.com/peterbourgon/diskv/v3"
+	"github.com/peterbourgon/diskv/v3"
 	"io"
 )
 
