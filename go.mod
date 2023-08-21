@@ -12,4 +12,5 @@ require (
 require (
 	github.com/golang/snappy v0.0.0-20180518054509-2e65f85255db // indirect
 	github.com/google/btree v1.1.2 // indirect
+	github.com/peterbourgon/diskv/v3 v3.0.1 // indirect
 )
