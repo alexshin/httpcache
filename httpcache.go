@@ -3,7 +3,6 @@
 //
 // It is only suitable for use as a 'private' cache (i.e. for a web-browser or an API-client
 // and not for a shared proxy).
-//
 package httpcache
 
 import (
@@ -45,6 +44,10 @@ func cacheKey(req *http.Request) string {
 	} else {
 		return req.Method + " " + req.URL.String()
 	}
+}
+
+func authorizeCache(req *http.Request, c *http.Client) bool {
+	return true
 }
 
 // CachedResponse returns the cached http.Response for req if present, and nil
@@ -93,14 +96,24 @@ func NewMemoryCache() *MemoryCache {
 	return c
 }
 
+// CacheConfig is used to configure the behaviour of the CachingTransport
+type CacheConfig struct {
+	// Function to generate a cache key from a request
+	CacheKeyFn func(req *http.Request) string
+	// Function to authorize reading from the cache if original resource is expired or has external
+	// validation (e.g. Signed URLs in GCS/S3/etc.)
+	AuthorizeCacheFn func(req *http.Request, c *http.Client) bool
+}
+
 // Transport is an implementation of http.RoundTripper that will return values from a cache
 // where possible (avoiding a network request) and will additionally add validators (etag/if-modified-since)
 // to repeated requests allowing servers to return 304 / Not Modified
 type Transport struct {
 	// The RoundTripper interface actually used to make requests
 	// If nil, http.DefaultTransport is used
-	Transport http.RoundTripper
-	Cache     Cache
+	Transport   http.RoundTripper
+	Cache       Cache
+	CacheConfig *CacheConfig
 	// If true, responses returned from the cache will be given an extra header, X-From-Cache
 	MarkCachedResponses bool
 }
@@ -108,7 +121,16 @@ type Transport struct {
 // NewTransport returns a new Transport with the
 // provided Cache implementation and MarkCachedResponses set to true
 func NewTransport(c Cache) *Transport {
-	return &Transport{Cache: c, MarkCachedResponses: true}
+	var t = &Transport{
+		Cache:               c,
+		MarkCachedResponses: true,
+	}
+	var con = &CacheConfig{
+		CacheKeyFn:       cacheKey,
+		AuthorizeCacheFn: authorizeCache,
+	}
+	t.CacheConfig = con
+	return t
 }
 
 // Client returns an *http.Client that caches responses.
@@ -141,7 +163,11 @@ func (t *Transport) RoundTrip(req *http.Request) (resp *http.Response, err error
 	cacheable := (req.Method == "GET" || req.Method == "HEAD") && req.Header.Get("range") == ""
 	var cachedResp *http.Response
 	if cacheable {
-		cachedResp, err = CachedResponse(t.Cache, req)
+		if t.CacheConfig.AuthorizeCacheFn != nil && t.CacheConfig.AuthorizeCacheFn(req, t.Client()) {
+			cachedResp, err = CachedResponse(t.Cache, req)
+		} else {
+			cachedResp, err = CachedResponse(t.Cache, req)
+		}
 	} else {
 		// Need to invalidate an existing value
 		t.Cache.Delete(cacheKey)

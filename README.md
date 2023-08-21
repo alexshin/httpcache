@@ -23,6 +23,27 @@ Cache Backends
 
 If you implement any other backend and wish it to be linked here, please send a PR editing this file.
 
+Signed URLs
+-----------
+
+Usually there is a big problem related to caching signed URLs. The problem is that the URL is signed with a timestamp, 
+so the URL is different every time. This means that the cache will never hit, and the request will always be sent 
+to the origin server.
+
+This package provides a solution to this problem. The solution is to use a `httpcache.CacheConfig` to 
+provide additional behavior to use cache.
+
+This solution allow you to pass:
+
+- `CacheKeyFn func(req *http.Request) string` - A function that returns a key for the cache. Then you can remove all
+  redundant information from the request, and return a key that will be used to store the response in the cache.
+- `AuthorizeCacheFn func(req *http.Request, c *http.Client) bool` - function that authorizes original request to be 
+  cached. This function should return `true` if the request should be cached, and `false` otherwise.
+
+Example for GCS you can find in [example/gcs](example/gcs) folder. AuthorizeCacheFn is implemented to do HEAD request
+to remote to check that client has access to the resource. After this you can get cached response by cache-key with
+no any specific URL-Signature parameters.
+
 License
 -------
 
